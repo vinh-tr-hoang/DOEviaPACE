@@ -37,14 +37,5 @@ There are two demos implemented in this repository:
 This repository was developed by [Vinh Hoang](mailto:hoang.tr.vinh@gmail.com).
 For any further queries or issues related to the code, please contact the author.
 
-## Dependencies
-- numpy
-- matplotlib
-- tensorflow 
-- sklearn
-- joblib 
-- seaborn
-- pandas
-
 ## License
 [License Information](https://github.com/vinh-tr-hoang/DOEviaPACE/blob/main/LICENSE)
