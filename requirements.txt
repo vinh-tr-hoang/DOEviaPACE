@@ -1,0 +1,26 @@
+# Dependencies for DOEviaPACE — verified on Python 3.13.
+# Install with:  pip install -r requirements.txt
+#
+# NOTE for the EIT demo (eit/):
+#   The surrogate model FEdata/surrogate_model.h5 was saved with Keras 2, and
+#   TensorFlow >= 2.16 ships Keras 3, which cannot load that legacy .h5 file.
+#   The `tf-keras` package below restores the Keras 2 API. It is activated via
+#   TF_USE_LEGACY_KERAS=1, which eit/eit_cl.py now sets automatically, so no
+#   manual environment variable is needed.
+#   Just run eit scripts from inside the eit/ directory (the FEdata/... paths are relative).
+#   The linear_gaussian/ demos need none of this (no TensorFlow).
+
+# Core numerics & data
+numpy==2.5.1
+scipy==1.18.0
+pandas==3.0.3
+
+# Machine learning
+tensorflow==2.21.0
+tf-keras==2.21.0       # Keras 2 compat layer; required to load the legacy .h5 surrogate model
+scikit-learn==1.9.0    # StandardScaler; the bundled .bin scalers were pickled with 1.1.3 -> harmless version-mismatch warning
+joblib==1.5.3
+
+# Plotting
+matplotlib==3.11.0
+seaborn==0.13.2

@@ -1,64 +1,59 @@
 """
-This code implements methods to compute the total expected conditional variance (ECV) for three different techniques
- - Projecting Approximation of Conditional Expectation (PACE), PACE with data augmentation, and Importance Sampling (IS)
-  for the multidimensional linear observational map.
+This code implements methods to compute the total expected conditional variance (tECV)
+for three different techniques:
+ - Projection-based Approximation of the Conditional Expectation (PACE),
+ - PACE with data augmentation, and 
+ - Importance Sampling (IS),
+for the multidimensional linear observational map.
 
-The script creates synthetic datasets and evaluates the performance of these methods by computing the mean absolute
- error (MAE) between estimated and reference ECV values.
+The script creates synthetic datasets and evaluates the performance of these methods 
+by computing the mean absolute error (MAE) between estimated and reference tECV values.
 
-The performance of each method is plotted in terms of the relative mean absolute error (relMAE) against the number of
- samples used.
+The performance of each method is plotted in terms of the relative mean absolute
+error (relMAE) against the number of samples used.
 """
 
 import numpy as np
-from scipy.stats import norm, uniform, multivariate_normal
+from scipy.stats import multivariate_normal
 import matplotlib.pyplot as plt
 
 
-# ------------------------------------- Functions related to PACE-based approach ------------------------------------- #
-def _pace_ecv(training_data: [np.ndarray, np.ndarray], evaluating_data: [np.ndarray, np.ndarray]) -> float:
+#--- Functions related to PACE-based approach ---#
+def _pace_ecv(training_data: tuple[np.ndarray, np.ndarray], evaluating_data: tuple[np.ndarray, np.ndarray]) -> float:
     """
-    Compute the total expected conditional variance (ECV) using the PACE
-    (Projecting Approximation of Conditional Expectation) method.
+    Compute the tECV based on PACE
+    (Projection-based Approximation of the Conditional Expectation).
 
     Parameters:
-        training_data (Tuple[np.ndarray, np.ndarray]): List containing the dataset for training, with two elements:
-            - training_data[0]: Matrix-like object containing samples of the identifying random vector.
-            - training_data[1]: Matrix-like object containing corresponding observations.
-        evaluating_data (Tuple[np.ndarray, np.ndarray]): List containing the dataset for evaluation, with two elements:
-            - evaluating_data[0]: Matrix-like object containing samples of the identifying random vector.
-            - evaluating_data[1]: Matrix-like object containing corresponding observations.
+        training_data (Tuple[np.ndarray, np.ndarray]): tuple containing the dataset for training,
+        with two elements:
+            - training_data[0]: Matrix-like object of samples of the identifying random vector.
+            - training_data[1]: Matrix-like object of corresponding observations.
+        evaluating_data (Tuple[np.ndarray, np.ndarray]): tuple containing the dataset for evaluation 
+        with the same structure as training_data.
 
     Returns:
-        float: Total expected conditional variance computed using the PACE method.
+        float: tECV computed based on PACE.
     """
-    # Compute mean of observations and identifying random vector from training dataset
     y_mean = np.mean(training_data[1], axis=0)
     q_mean = np.mean(training_data[0], axis=0)
-
-    # Compute empirical covariance matrix of observations
-    cov_y = np.cov(training_data[1], rowvar=False)
+    cov_y = np.cov(training_data[1], rowvar=False, bias=True)
 
     training_data_y = training_data[1] - y_mean
     training_data_q = training_data[0] - q_mean
-
-    # Compute empirical covariance between identifying random vector and observations
     cov_q_y = np.mean(training_data_q[:, :, np.newaxis] @ training_data_y[:, np.newaxis, :], axis=0)
 
-    # Compute empirical PACE coefficients
+    # Fit the PACE (linear) coefficients, then evaluate on the evaluation set
     a_pace = cov_q_y @ np.linalg.inv(cov_y)
     b_pace = q_mean - np.mean(training_data[1] @ a_pace.T, axis=0)
-
-    # Compute empirical PACE
     pace_ce = evaluating_data[1] @ a_pace.T + b_pace
-
-    # Return empirical ECV
     return np.sum(np.mean((evaluating_data[0] - pace_ce) ** 2, axis=0))
 
 
-def pace_ecv(d=None, N=None, M=None) -> float:
+def pace_ecv(d: float, N: int, M: int) -> float:
     """
-    Compute the total expected conditional variance (ECV) using the PACE method without data augmentation.
+    Compute the tECV based on PACE
+    without data augmentation.
 
     Parameters:
         d (float): Design parameter.
@@ -66,7 +61,7 @@ def pace_ecv(d=None, N=None, M=None) -> float:
         M (int): Number of samples in the evaluation dataset.
 
     Returns:
-        float: Total expected conditional variance computed using the PACE method.
+        float: tECV computed based on PACE.
 
     """
     training_data = create_dataset(d=d, N=N)
@@ -76,34 +71,33 @@ def pace_ecv(d=None, N=None, M=None) -> float:
 
 def data_augmented_pace_ecv(d: float, N: int, M: int) -> float:
     """
-        Compute the total expected conditional variance (ECV) using the PACE (Projecting Approximation of Conditional
-         Expectation) method with data augmentation.
+    Compute the tECV based on PACE with data augmentation.
 
-        Parameters:
-            d (float): Design parameter.
-            N (int): Number of samples in the training dataset.
-            M (int): Number of samples in the evaluation dataset.
+    Parameters:
+        d (float): Design parameter.
+        N (int): Number of samples in the training dataset.
+        M (int): Number of samples in the evaluation dataset.
 
-        Returns:
-            float: Total expected conditional variance computed using the PACE method.
-
-        """
+    Returns:
+        float: tECV computed based on PACE.
+    """
     augmented_training_data = create_augmented_dataset(d=d, N=N)
     augmented_evaluating_data = create_augmented_dataset(d=d, N=M)
     return _pace_ecv(augmented_training_data, augmented_evaluating_data)
 
 
-# ------------------------------------------ Important sampling-based approach --------------------------------------- #
-def important_sampling_ecv(d: float, N_inner: int) -> float:
+#--- Important sampling-based approach ---#
+def importance_sampling_ecv(d: float, N_inner: int) -> float:
     """
-    Compute the total expected conditional variance (ECV) using the Importance Sampling (IS) method.
+    Compute the tECV using
+    the Importance Sampling (IS) method.
 
     Parameters:
         d (float): Design parameter
         N_inner (int): Number of samples of the inner loop.
 
     Returns:
-        float: Total expected conditional variance computed using the IS method.
+        float: tECV computed using the IS method.
     """
     # Outer dataset with size of 1
     Do = create_dataset(d=d, N=1)
@@ -113,21 +107,22 @@ def important_sampling_ecv(d: float, N_inner: int) -> float:
     q_samples = q_rv.rvs(size=N_inner)
     y_samples = noise_free_observational_map(q=q_samples, d=d)
 
-    # Compute the likelihood as the density function of the difference between observed and generated samples
     likelihood = epsilon_rv.pdf(y_samples - y)
 
-    # Normalize the likelihood by dividing it by its mean for improving numerical stability
+    # Normalize the likelihood to improve the numerical stability
     likelihood_mean = np.mean(likelihood)
+    if likelihood_mean == 0.:
+        return np.nan
     likelihood = likelihood / likelihood_mean
 
-    # Compute the logarithm of the normalized likelihood with a small offset to avoid division by zero errors
+    # Importance-sampling posterior mean and variance
     posterior_mean = np.mean(q_samples * likelihood[:, np.newaxis], axis=0)
     posterior_var = np.mean(q_samples ** 2 * likelihood[:, np.newaxis], axis=0) - posterior_mean ** 2
 
     return np.sum(posterior_var)
 
 
-# ------------------------------------- Functions related to observational model ------------------------------------- #
+#--- Functions related to observational model ---#
 def linear_observation_matrix(d: float) -> np.ndarray:
     """
     Return the linear observational map's coefficient
@@ -170,7 +165,7 @@ def observational_map(q: np.ndarray, d: float) -> np.ndarray:
     return noise_free_map + epsilon
 
 
-def create_dataset(d: float, N: int) -> [np.ndarray, np.ndarray]:
+def create_dataset(d: float, N: int) -> tuple[np.ndarray, np.ndarray]:
     """
     Create a dataset of samples by generating observations based on a noise-free observational map.
 
@@ -180,8 +175,8 @@ def create_dataset(d: float, N: int) -> [np.ndarray, np.ndarray]:
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: A tuple containing the dataset with two elements:
-            - q_samples: Matrix-like object containing samples of the identifying random vector.
-            - y_samples: Matrix-like object containing corresponding observations.
+            - q_samples: Matrix-like object of samples of the identifying random vector.
+            - y_samples: Matrix-like object of corresponding observations.
 
     """
     q_samples = q_rv.rvs(size=N)
@@ -189,7 +184,7 @@ def create_dataset(d: float, N: int) -> [np.ndarray, np.ndarray]:
     return q_samples, y_samples
 
 
-def create_augmented_dataset(d: float, N: int, Na: int = 30) -> [np.ndarray, np.ndarray]:
+def create_augmented_dataset(d: float, N: int, Na: int = 30) -> tuple[np.ndarray, np.ndarray]:
     """
     Create an augmented dataset by generating additional samples with added noise.
 
@@ -199,9 +194,10 @@ def create_augmented_dataset(d: float, N: int, Na: int = 30) -> [np.ndarray, np.
         Na (int): Number of times to replicate the base dataset.
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: A list containing the augmented dataset with two elements:
-            - q_samples: Matrix-like object containing samples of the identifying random vector.
-            - y_samples: Matrix-like object containing augmented noisy observations.
+        Tuple[np.ndarray, np.ndarray]: A tuple containing the augmented dataset 
+        with two elements:
+            - q_samples: Matrix-like object of samples of the identifying random vector.
+            - y_samples: Matrix-like object of augmented noisy observations.
 
     """
     q_samples_base = q_rv.rvs(size=N)
@@ -213,17 +209,17 @@ def create_augmented_dataset(d: float, N: int, Na: int = 30) -> [np.ndarray, np.
 
 def ref_ecv(d: float) -> float:
     """
-    Reference value of total expected conditional variance (ECV)
+    Reference value of the tECV
 
     Parameters:
         d (float): Design parameter used in the computation.
 
     Returns:
-        float: The empirical coverage error variance (ECV).
+        float: The tECV.
 
     """
     H = linear_observation_matrix(d)
-    observation_covariance = sigma_q ** 2 * H @ np.identity(dim_q) @ H.T + sigma_epsilon ** 2 * np.identity(dim_q)
+    observation_covariance = sigma_q ** 2 * H @ H.T + sigma_epsilon ** 2 * np.identity(dim_q)
     cross_covariance = sigma_q ** 2 * H
     K_gain_matrix = cross_covariance @ np.linalg.inv(observation_covariance)
     prior_covariance = sigma_q ** 2 * np.identity(dim_q)
@@ -234,65 +230,43 @@ def ref_ecv(d: float) -> float:
 
 if __name__ == '__main__':
 
-    # Dimension of the identifying random vector
     dim_q = 10
-    # Standard deviation of the identifying random variable
-    sigma_q = 1
-    # The standard deviation of the observational errors
-    sigma_epsilon = 1e-1
+    sigma_q = 1           # std of the identifying random variable
+    sigma_epsilon = 1e-1  # std of the observational errors
 
-    # Define multivariate normal random variables of identifying parameters and observation errors
     q_rv = multivariate_normal(mean=np.zeros(shape=(dim_q,)), cov=sigma_q ** 2 * np.eye(dim_q))
     epsilon_rv = multivariate_normal(mean=np.zeros(shape=(dim_q,)), cov=sigma_epsilon ** 2 * np.eye(dim_q))
 
-    # Selected design parameter for testing different method
-    d = 0.5
-    # List of sample size in the training dataset for PACE approach
-    N = np.array([100, 500, 1000, 5000, 10000, 20000])
-    # List of sample size in the evaluation dataset for PACE
+    d = 0.5                                             # design parameter under test
+    N = np.array([100, 500, 1000, 5000, 10000, 20000]) # PACE training/eval sample sizes
     M = N
-    # List of sample sizes for Importance Sampling
-    N_inner = [200, 500, 1000, 5000, 10000, 40000]
-
-    # Number of runs for computing statistical error
+    N_inner = [200, 500, 1000, 5000, 10000, 40000]     # IS inner-loop sample sizes
     number_runs = 100
 
-    # Compute the reference ECV
     ecv_reference = ref_ecv(d=d)
 
-    # Initialize arrays to store ECV values
     ecv_pace = np.zeros(shape=(len(N), number_runs))
     ecv_pace_aug = np.zeros_like(ecv_pace)
     ecv_is = np.zeros(shape=(len(N_inner), number_runs))
 
-    # Compute ECV using PACE and PACE with data augmentation
+    # Estimate ECV over number_runs repetitions: PACE, PACE + augmentation, and IS
     for i in range(len(N)):
         ecv_pace[i, :] = np.array([pace_ecv(d=d, N=N[i], M=M[i]) for _ in range(number_runs)])
         ecv_pace_aug[i, :] = np.array([data_augmented_pace_ecv(d=d, N=N[i], M=M[i]) for _ in range(number_runs)])
-
-    # Compute ECV using Importance Sampling
     for i in range(len(N_inner)):
-        ecv_is[i, :] = np.array([important_sampling_ecv(d=d, N_inner=N_inner[i]) for _ in range(number_runs)])
+        ecv_is[i, :] = np.array([importance_sampling_ecv(d=d, N_inner=N_inner[i]) for _ in range(number_runs)])
 
-    # Calculate L1 error between ECV values and reference ECV
+    # Mean absolute error vs the reference ECV
     l1error_pace = np.mean(np.abs(ecv_pace - ecv_reference), axis=1)
     l1error_pace_aug = np.mean(np.abs(ecv_pace_aug - ecv_reference), axis=1)
     l1error_is = np.mean(np.abs(ecv_is - ecv_reference), axis=1)
 
-    # Plot relative mean absolute errors
     fig, ax = plt.subplots()
-
-    # Plot relative mean absolute errors for Importance Sampling
     ax.plot(N_inner, l1error_is / ecv_reference, '-x', label='IS-based')
-
-    # Plot relative mean absolute errors for PACE
     ax.plot(N + M, l1error_pace / ecv_reference, '-s', label='PACE-based')
-
-    # Plot relative mean absolute errors for PACE with augmentation
     ax.plot(N + M, l1error_pace_aug / ecv_reference, '--o', label='PACE-based +  data augmentation')
-
-    # Plot theoretical bound of PACE
-    ax.plot(N + M, 2 * np.sqrt(2. / N), '--', linewidth=2, label=r'$\sqrt{{2}/{N}}+\sqrt{{2}/{M}}$')
+    ax.plot(N + M, 2 * np.sqrt(2. / N), '--', linewidth=2, 
+        label=r'$\sqrt{{2}/{N}}+\sqrt{{2}/{M}}$')  # theoretical bound
 
     ax.set_xscale('log')
     ax.set_yscale('log')
@@ -301,6 +275,5 @@ if __name__ == '__main__':
     ax.legend(fontsize='10')
     ax.set_ylim([1e-4, 10])
 
-    # Save the figure as a PDF file
     fig.savefig('MultiDimLinear_Gaussian_Dim_' + str(dim_q) + '.pdf')
     plt.show()

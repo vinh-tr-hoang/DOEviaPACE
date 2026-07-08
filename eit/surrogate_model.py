@@ -1,3 +1,6 @@
+import os
+os.environ.setdefault("TF_USE_LEGACY_KERAS", "1")  # match eit_cl.py: build/save .h5 with Keras 2 so CeEIT can load it
+import sys
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from joblib import dump
@@ -11,20 +14,20 @@ tf.keras.backend.set_floatx('float32')
 class SurrogateEit:
     def __init__(self):
         """
-        Initializes the SurrogateEit class.
+        Initialize the SurrogateEit class.
 
         This class is responsible for constructing a surrogate model from Finite Element (FE) data.
         It also contains methods for reusing the created surrogate model.
 
         Attributes:
-            design_param_dim (int): Dimension of the design vector 'd'. Here, it's set to 9.
+            design_param_dim (int): Dimension of the design vector 'd'. Here, it's set to 10.
             angle_dim (int): Dimension of the vector 'q' to be identified. Here, it's set to 2.
             MLPRegressor (tf.keras.Sequential): A multi-layer perceptron model used as the surrogate model. This model
             consists of several layers, including input, hidden, and output layers.
         """
 
-        # dimension of the design vector (applied currents at electrodes: d)
-        self.design_param_dim= 10
+        # number of electrodes (only design_param_dim - 1 currents are independent)
+        self.design_param_dim = 10
         # dimension of the vector to be identified (plies angles: q)
         self.angle_dim=2
         # dimension of the measurement vector (potentials at electrodes: y)
@@ -32,30 +35,26 @@ class SurrogateEit:
         # deep feed-forward ANN used as the surrogate model
         self.MLPRegressor = tf.keras.Sequential()
         layer_options = {'kernel_initializer': 'random_normal', 'activation': 'relu', 'kernel_regularizer': None}
-        # layer 1 (input)
         self.MLPRegressor.add(tf.keras.layers.Dense(100, input_shape=(self.angle_dim + self.design_param_dim -1,),
                                                     **layer_options))
-        # layer 2
         self.MLPRegressor.add(tf.keras.layers.Dense(100, **layer_options))
-        # layer 4 (output)
         self.MLPRegressor.add(tf.keras.layers.Dense(self.potential_dim - 1, kernel_initializer='random_normal',
                                                     activation=None,))
 
 
     def load_data(self):
         """
-         Loads the processed FE data used in the EIT experiment.
+         Load the processed FE data used in the EIT experiment.
          It directly reads the combined npz file containing the processed data, which includes design parameters,
-        piles angles, and potentials at the electrodes.
+        plies angles, and potentials at the electrodes.
 
         Returns:
             dict: A dictionary containing the processed data. This includes:
                 - 'current': A nx9 matrix, where each row is a vector of design parameters 'd' sampled from a uniform distribution in [-1,1]^9.
-                - 'angle': A nx2 matrix, each row of which is a two-dimensional vector of piles angles, sampled from its prior distribution.
-                - 'potential': A nx9 matrix, each row of which is a vector potentials at the electrodes corresponding to the previous sample of the design parameters and angles.
-                (where 'n' is the total number of samples, here, it's 86974.)
+                - 'angle': A nx2 matrix, each row of which is a two-dimensional vector of plies angles, sampled from its prior distribution.
+                - 'potential': A nx9 matrix, each row of which is a vector of potentials at the electrodes corresponding to the previous sample of the design parameters and angles.
+                (where 'n' is the total number of samples, here, it's 84199.)
         """
-        data = {}
         data = np.load ('FEdata/fem_data.npz')
         return data
 
@@ -87,7 +86,7 @@ class SurrogateEit:
 
     def get_potential_scaler(self):
         """
-        Prepares and returns the standard scaler for potentials data.
+        Prepare and return the standard scaler for potentials data.
 
         It first loads the processed FE data and then fits a StandardScaler on the potentials data.
         After fitting, it saves the scaler for future use.
@@ -102,7 +101,7 @@ class SurrogateEit:
         reduced_potential_sc = StandardScaler().fit(data['potential'])
 
         # Full  potential data:  the concatenation of the 'potential' data and the negative sum of 'potential' across each row
-        full_potential = np.c_[np.array (data['potential']), - np.array(data['potential']).sum(axis=1)]
+        full_potential = np.c_[np.array(data['potential']), - np.array(data['potential']).sum(axis=1)]
 
         # Initialize and fit a StandardScaler on the newly computed potential
         full_potential_sc = StandardScaler().fit(full_potential)
@@ -115,7 +114,7 @@ class SurrogateEit:
 
     def training(self):
         """
-        Trains the surrogate model (MLPRegressor) using the processed FE data.
+        Train the surrogate model (MLPRegressor) using the processed FE data.
 
         The model is trained using Adam optimizer and Mean Squared Error (MSE) loss.
         Training data is further split into training and validation subsets in a 70:30 ratio.
@@ -123,7 +122,7 @@ class SurrogateEit:
 
         Returns:
             Tuple[tf.keras.callbacks.History, tf.keras.Sequential]: A tuple where:
-                - The first element is the training history, which includes loss and accuracy metrics over the training epochs.
+                - The first element is the training history, which includes the loss (MSE) over the training epochs.
                 - The second element is the trained MLPRegressor model.
         """
         # Set training options: batch size, number of epochs, validation split ratio and verbosity level
@@ -150,24 +149,20 @@ class SurrogateEit:
         return history, self.MLPRegressor
 
 
-def main ():
+def main():
     surrogate_eit = SurrogateEit()
-    hist, model = surrogate_eit.training()
-    model.save('FEdata/surrogate_model_retrain.h5')
-
-
-
+    surrogate_eit.get_potential_scaler ()
+    _, model = surrogate_eit.training()
+    model.save('FEdata/surrogate_model.h5')
 
 
 if __name__ == '__main__':
-    # Run the following commands for data visualisation
-    # surrogate_eit = SurrogateEit()
-    # surrogate_eit.data_visualisation()
 
-    # Run the following commands to get the scalers
-    # surrogate_eit = SurrogateEit()
-    # surrogate_eit.get_potential_scaler ()
+    # Parse `retrain=1` (or `retrain=0`) from the command line; default 0.
+    args = dict(a.split('=', 1) for a in sys.argv[1:] if '=' in a)
+    retrain = args.get('retrain', '0') in ('1', 'true', 'True')
 
-    # Run the following command to train surrogate model
-    # main()
-
+    # Visualise the FE data (opens blocking pairplot windows)
+    SurrogateEit().data_visualisation()
+    if retrain:
+        main()

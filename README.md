@@ -1,11 +1,11 @@
 # Bayesian Experimental Design via Projection-based Approximation of the Conditional Expectation (PACE) 
 This repository hosts the codebase associated with the research paper 
-"[Scalable method for Bayesian experimental design without integrating over posterior distribution](https://arxiv.org/abs/2306.17615)" by Vinh Hoang, Luis Espath,
-Sebastian Krumscheid, and Raúl Tempone.
+"[Scalable method for Bayesian experimental design without integrating over posterior distribution](https://epubs.siam.org/doi/10.1137/23M1603364)" by Vinh Hoang, Luis Espath,
+Sebastian Krumscheid, and Raúl Tempone ([arXiv version](https://arxiv.org/abs/2306.17615)).
 The article presents an efficient computational method solving A-optimal Bayesian design of experiments problems
 where the observational model is based on partial differential equations and is computationally expensive to evaluate.
 In this approach, we derive the expected conditional variance from the variance of the conditional expectation by
-leveraging the law of total variance. Further, the orthogonal projection property is employed to approximate the conditional expectation.
+leveraging the law of total variance. Further, the orthogonal projection property is employed to approximate the conditional expectation. 
 
 Within this implementation, an Artificial Neural Network (ANN) is harnessed to approximate the complex non-linear conditional expectation.
 To address the challenge of continuous experimental design parameters, we have integrated the training process of the ANN into the minimization of the expected conditional variance. 
@@ -15,6 +15,30 @@ There are two demos implemented in this repository:
 
 - Linear-Gaussian case, and
 - Electrical impedance tomography (eit).
+
+## Setup and run
+
+Set up a virtual environment and install the dependencies (Python 3.13):
+```bash
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Run the **Linear-Gaussian** demo from the repository root:
+```bash
+python linear_gaussian/onedimensional_linear_gaussian.py
+python linear_gaussian/multidimensional_linear_gaussian.py
+```
+
+Run the **EIT** demo from inside the `eit/` directory (paths are resolved relative to it):
+```bash
+cd eit
+python eit_main.py
+```
+This demo requires the pretrained assets in `eit/FEdata/`: `surrogate_model.h5`,
+`full_potential_scaler.bin`, and `reduced_potential_scaler.bin`. To rebuild the surrogate model
+from the FE dataset (`fem_data.npz`), run `python surrogate_model.py retrain=1` from the same directory.
 
 ## Citation
 ```
@@ -37,14 +61,6 @@ There are two demos implemented in this repository:
 This repository was developed by [Vinh Hoang](mailto:hoang.tr.vinh@gmail.com).
 For any further queries or issues related to the code, please contact the author.
 
-## Dependencies
-- numpy
-- matplotlib
-- tensorflow 
-- sklearn
-- joblib 
-- seaborn
-- pandas
 
 ## License
 [License Information](https://github.com/vinh-tr-hoang/DOEviaPACE/blob/main/LICENSE)
